@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{{ course.name }} - Online Course</title>
+
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</head>
+
+<body>
+    <!-- Navigation bar -->
+    <nav class="navbar navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand"
+               href="{% url 'onlinecourse:index' %}">Home</a>
+
+            <ul class="nav navbar-nav navbar-right">
+                {% if user.is_authenticated %}
+                    <li>
+                        <span class="navbar-text">
+                            {{ user.first_name }} ({{ user.username }})
+                        </span>
+                        <a class="btn btn-link"
+                           href="{% url 'onlinecourse:logout' %}">Logout</a>
+                    </li>
+                {% else %}
+                    <li>
+                        <form class="form-inline"
+                              action="{% url 'onlinecourse:login' %}"
+                              method="post">
+                            {% csrf_token %}
+                            <input type="text"
+                                   class="form-control mr-2"
+                                   placeholder="Username"
+                                   name="username"
+                                   required>
+
+                            <input type="password"
+                                   class="form-control mr-2"
+                                   placeholder="Password"
+                                   name="psw"
+                                   required>
+
+                            <button class="btn btn-primary"
+                                    type="submit">Login</button>
+
+                            <a class="btn btn-link"
+                               href="{% url 'onlinecourse:registration' %}">
+                                Sign Up
+                            </a>
+                        </form>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Course details and lessons -->
+    <div class="container mt-4">
+        <h2>{{ course.name }}</h2>
+        <p>{{ course.description }}</p>
+
+        <h4 class="mt-4">Course Lessons</h4>
+
+        {% for lesson in course.lesson_set.all %}
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h5>
+                        Lesson {{ lesson.order|add:1 }}: {{ lesson.title }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {{ lesson.content }}
+                </div>
+            </div>
+        {% empty %}
+            <p>No lessons are available for this course.</p>
+        {% endfor %}
+
+        <!-- Exam questions and choices -->
+        <div class="mt-5 mb-5">
+            <h3>Course Assessment</h3>
+            <p>Select one answer for each question, then submit your exam.</p>
+
+            {% if course.question_set.all %}
+                {% if user.is_authenticated %}
+                    <form method="post"
+                          action="{% url 'onlinecourse:submit' course.id %}">
+                        {% csrf_token %}
+
+                        {% for question in course.question_set.all %}
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <strong>
+                                        Question {{ forloop.counter }}:
+                                        {{ question.content }}
+                                    </strong>
+                                    <span class="badge badge-info">
+                                        {{ question.grade }} points
+                                    </span>
+                                </div>
+
+                                <div class="card-body">
+                                    {% for choice in question.choice_set.all %}
+                                        <div class="form-check mb-2">
+                                            <input
+                                                class="form-check-input"
+                                                type="radio"
+                                                name="choice_{{ question.id }}"
+                                                id="choice_{{ choice.id }}"
+                                                value="{{ choice.id }}"
+                                                required>
+
+                                            <label
+                                                class="form-check-label"
+                                                for="choice_{{ choice.id }}">
+                                                {{ choice.content }}
+                                            </label>
+                                        </div>
+                                    {% empty %}
+                                        <p class="text-muted">
+                                            No choices have been added to this question.
+                                        </p>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endfor %}
+
+                        <button type="submit" class="btn btn-primary mt-4">
+                            Submit Exam
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="alert alert-warning mt-3">
+                        Please log in to take this assessment.
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-info mt-3">
+                    No assessment questions have been added to this course yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

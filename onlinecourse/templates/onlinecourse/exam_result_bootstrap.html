@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Exam Results</title>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light">
+        <a class="navbar-brand" href="{% url 'onlinecourse:index' %}">
+            Home
+        </a>
+    </nav>
+
+    <div class="container mt-5">
+        {% if passed %}
+            <div class="alert alert-success">
+                <h2>Congratulations!</h2>
+                <p>You have successfully passed the exam.</p>
+            </div>
+        {% else %}
+            <div class="alert alert-warning">
+                <h2>Exam Results</h2>
+                <p>Keep practicing and try again.</p>
+            </div>
+        {% endif %}
+
+        <h3>{{ course.name }}</h3>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h4>Your Score</h4>
+                <p>Score: {{ grade }} / {{ total_score }}</p>
+                <p>Percentage: {{ percentage }}%</p>
+            </div>
+        </div>
+
+        <h4 class="mt-4">Question Results</h4>
+
+        {% for result in question_results %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    Question {{ forloop.counter }}:
+                    {{ result.question.content }}
+                </div>
+                <div class="card-body">
+                    <p>
+                        Your answer:
+                        {% if result.selected_choice %}
+                            {{ result.selected_choice.content }}
+                        {% else %}
+                            Not answered
+                        {% endif %}
+                    </p>
+
+                    {% if result.is_correct %}
+                        <p class="text-success">Correct answer</p>
+                    {% else %}
+                        <p class="text-danger">Incorrect answer</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <a class="btn btn-primary mt-4 mb-4"
+           href="{% url 'onlinecourse:course_details' pk=course.id %}">
+            Back to Course
+        </a>
+    </div>
+</body>
+</html>
