@@ -29,7 +29,7 @@ def show_exam_result(request, course_id, submission_id):
     course = get_object_or_404(Course, pk=course_id)
     submission = get_object_or_404(Submission, pk=submission_id)
     
-    score = 0
+    grade = 0
     total_score = 0
     
     questions = course.question_set.all()
@@ -38,12 +38,12 @@ def show_exam_result(request, course_id, submission_id):
         selected_choices = submission.choices.filter(question=question)
         selected_ids = [choice.id for choice in selected_choices]
         if question.is_get_score(selected_ids):
-            score += question.grade
+            grade += question.grade
             
     context = {
         'course': course,
         'submission': submission,
-        'grade': score,
+        'grade': grade,
         'total_score': total_score,
     }
     return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
