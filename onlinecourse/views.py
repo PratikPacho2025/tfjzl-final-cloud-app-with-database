@@ -8,7 +8,7 @@ from django.views import generic
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 
-from .models import Course, Enrollment, Question, Choice, Submission
+from .models import Choice, Course, Enrollment, Question, Submission
 
 logger = logging.getLogger(__name__)
 
@@ -144,39 +144,43 @@ def enroll(request, course_id):
 
 
 def extract_answers(request):
-    selected_ids = []
+    selected_ids = set()
 
     for key, value in request.POST.items():
         if key.startswith('choice_'):
             try:
-                selected_ids.append(int(value))
+                selected_ids.add(int(value))
             except (TypeError, ValueError):
                 continue
+            continue
+
+        if key.startswith('choice'):
+            raw_choice_id = key.replace('choice', '', 1)
+            if raw_choice_id.isdigit():
+                selected_ids.add(int(raw_choice_id))
 
     return selected_ids
 
 
 def get_score(course, selected_ids):
-    """
-    Return (earned_score, total_score) for a course and selected choices.
-    Only choices belonging to questions in this course are considered.
-    """
-    questions = Question.objects.filter(course=course)
+    questions = Question.objects.filter(course=course).prefetch_related('choice_set')
+    selected_choices = Choice.objects.filter(
+        id__in=selected_ids,
+        question__course=course,
+    )
+    selected_by_question = {}
+
+    for choice in selected_choices:
+        selected_by_question.setdefault(choice.question_id, set()).add(choice.id)
+
     earned_score = 0
     total_score = 0
 
-    selected_choices = Choice.objects.filter(
-        id__in=selected_ids,
-        question__course=course
-    )
-
     for question in questions:
         total_score += question.grade
-
-        choice = selected_choices.filter(question=question).first()
-
-        if choice is not None and choice.is_correct:
-            earned_score += question.grade
+        earned_score += question.is_get_score(
+            selected_by_question.get(question.id, set())
+        )
 
     return earned_score, total_score
 
@@ -199,18 +203,14 @@ def submit(request, course_id):
         course=course
     )
 
-    submission = Submission.objects.create(enrollment=enrollment)
-
     selected_ids = extract_answers(request)
+    valid_choices = Choice.objects.filter(
+        id__in=selected_ids,
+        question__course=course
+    )
 
-    for choice_id in selected_ids:
-        choice = Choice.objects.filter(
-            pk=choice_id,
-            question__course=course
-        ).first()
-
-        if choice is not None:
-            submission.choices.add(choice)
+    submission = Submission.objects.create(enrollment=enrollment)
+    submission.choices.set(valid_choices)
 
     return redirect(
         'onlinecourse:show_exam_result',
@@ -236,29 +236,37 @@ def show_exam_result(request, course_id, submission_id):
             'You are not allowed to view this exam result.'
         )
 
-    selected_ids = list(
-        submission.choices.values_list('id', flat=True)
-    )
+    selected_choices = submission.choices.filter(
+        question__course=course
+    ).select_related('question')
+    selected_ids = list(selected_choices.values_list('id', flat=True))
 
     earned_score, total_score = get_score(course, selected_ids)
 
-    questions = Question.objects.filter(course=course)
-    selected_choices = submission.choices.all()
+    questions = Question.objects.filter(course=course).prefetch_related('choice_set')
+    selected_by_question = {}
+    for choice in selected_choices:
+        selected_by_question.setdefault(choice.question_id, []).append(choice)
+
     question_results = []
 
     for question in questions:
-        selected_choice = selected_choices.filter(
-            question=question
-        ).first()
-
+        selected_for_question = selected_by_question.get(question.id, [])
+        selected_ids_for_question = {
+            choice.id for choice in selected_for_question
+        }
+        correct_choices = list(
+            question.choice_set.filter(is_correct=True)
+        )
         is_correct = (
-            selected_choice is not None
-            and selected_choice.is_correct
+            question.is_get_score(selected_ids_for_question) == question.grade
         )
 
         question_results.append({
             'question': question,
-            'selected_choice': selected_choice,
+            'selected_choices': selected_for_question,
+            'selected_choice': selected_for_question[0] if selected_for_question else None,
+            'correct_choices': correct_choices,
             'is_correct': is_correct,
         })
 
@@ -274,6 +282,7 @@ def show_exam_result(request, course_id, submission_id):
         'question_results': question_results,
         'selected_ids': selected_ids,
         'grade': earned_score,
+        'possible': total_score,
         'total_score': total_score,
         'percentage': percentage,
         'passed': percentage >= 80,

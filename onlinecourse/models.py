@@ -132,6 +132,13 @@ class Question(models.Model):
     def __str__(self):
         return self.content
 
+    def is_get_score(self, selected_choice_ids):
+        correct_choice_ids = set(
+            self.choice_set.filter(is_correct=True).values_list("id", flat=True)
+        )
+        selected_choice_ids = set(selected_choice_ids)
+        return self.grade if selected_choice_ids == correct_choice_ids else 0
+
 
 # Choice model
 class Choice(models.Model):
@@ -153,3 +160,9 @@ class Submission(models.Model):
         on_delete=models.CASCADE,
     )
     choices = models.ManyToManyField(Choice)
+
+    def __str__(self):
+        return (
+            f"Submission(id={self.id}, course={self.enrollment.course_id}, "
+            f"user={self.enrollment.user_id})"
+        )
