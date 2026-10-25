@@ -33,7 +33,7 @@
         <div class="card mt-3">
             <div class="card-body">
                 <h4>Your Score</h4>
-                <p>Score: {{ grade }} / {{ total_score }}</p>
+                <p>Score: {{ grade }} / {{ possible }}</p>
                 <p>Percentage: {{ percentage }}%</p>
             </div>
         </div>
@@ -49,8 +49,10 @@
                 <div class="card-body">
                     <p>
                         Your answer:
-                        {% if result.selected_choice %}
-                            {{ result.selected_choice.content }}
+                        {% if result.selected_choices %}
+                            {% for selected_choice in result.selected_choices %}
+                                {{ selected_choice.content }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
                         {% else %}
                             Not answered
                         {% endif %}
@@ -60,6 +62,14 @@
                         <p class="text-success">Correct answer</p>
                     {% else %}
                         <p class="text-danger">Incorrect answer</p>
+                        <p>
+                            Correct answer(s):
+                            {% for correct_choice in result.correct_choices %}
+                                {{ correct_choice.content }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                None
+                            {% endfor %}
+                        </p>
                     {% endif %}
                 </div>
             </div>
