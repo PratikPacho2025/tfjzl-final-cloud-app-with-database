@@ -24,10 +24,18 @@ def registration_request(request):
         )
 
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['psw']
-        first_name = request.POST['firstname']
-        last_name = request.POST['lastname']
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('psw', '')
+        first_name = request.POST.get('firstname', '')
+        last_name = request.POST.get('lastname', '')
+
+        if not username or not password:
+            context['message'] = 'Username and password are required.'
+            return render(
+                request,
+                'onlinecourse/user_registration_bootstrap.html',
+                context
+            )
 
         if User.objects.filter(username=username).exists():
             context['message'] = 'User already exists.'
@@ -46,13 +54,15 @@ def registration_request(request):
         login(request, user)
         return redirect('onlinecourse:index')
 
+    return redirect('onlinecourse:index')
+
 
 def login_request(request):
     context = {}
 
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['psw']
+        username = request.POST.get('username', '')
+        password = request.POST.get('psw', '')
         user = authenticate(username=username, password=password)
 
         if user is not None:
@@ -60,11 +70,6 @@ def login_request(request):
             return redirect('onlinecourse:index')
 
         context['message'] = 'Invalid username or password.'
-        return render(
-            request,
-            'onlinecourse/user_login_bootstrap.html',
-            context
-        )
 
     return render(
         request,
@@ -84,7 +89,6 @@ def check_if_enrolled(user, course):
             user=user,
             course=course
         ).exists()
-
     return False
 
 
@@ -104,9 +108,21 @@ class CourseListView(generic.ListView):
         return courses
 
 
+
 class CourseDetailView(generic.DetailView):
     model = Course
     template_name = 'onlinecourse/course_details_bootstrap.html'
+    context_object_name = 'course'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        course = self.object
+        context['course'].is_enrolled = check_if_enrolled(
+            self.request.user,
+            course
+        )
+        return context
+
 
 
 def enroll(request, course_id):
@@ -123,24 +139,46 @@ def enroll(request, course_id):
         course.save()
 
     return HttpResponseRedirect(
-        reverse(
-            'onlinecourse:course_details',
-            args=(course.id,)
-        )
+        reverse('onlinecourse:course_details', args=(course.id,))
     )
 
 
 def extract_answers(request):
-    submitted_answers = []
+    selected_ids = []
 
     for key, value in request.POST.items():
         if key.startswith('choice_'):
             try:
-                submitted_answers.append(int(value))
+                selected_ids.append(int(value))
             except (TypeError, ValueError):
                 continue
 
-    return submitted_answers
+    return selected_ids
+
+
+def get_score(course, selected_ids):
+    """
+    Return (earned_score, total_score) for a course and selected choices.
+    Only choices belonging to questions in this course are considered.
+    """
+    questions = Question.objects.filter(course=course)
+    earned_score = 0
+    total_score = 0
+
+    selected_choices = Choice.objects.filter(
+        id__in=selected_ids,
+        question__course=course
+    )
+
+    for question in questions:
+        total_score += question.grade
+
+        choice = selected_choices.filter(question=question).first()
+
+        if choice is not None and choice.is_correct:
+            earned_score += question.grade
+
+    return earned_score, total_score
 
 
 def submit(request, course_id):
@@ -161,21 +199,21 @@ def submit(request, course_id):
         course=course
     )
 
-    submission = Submission.objects.create(
-        enrollment=enrollment
-    )
+    submission = Submission.objects.create(enrollment=enrollment)
 
-    for choice_id in extract_answers(request):
+    selected_ids = extract_answers(request)
+
+    for choice_id in selected_ids:
         choice = Choice.objects.filter(
             pk=choice_id,
             question__course=course
         ).first()
 
-        if choice:
+        if choice is not None:
             submission.choices.add(choice)
 
     return redirect(
-        'onlinecourse:exam_result',
+        'onlinecourse:show_exam_result',
         course_id=course.id,
         submission_id=submission.id
     )
@@ -198,11 +236,14 @@ def show_exam_result(request, course_id, submission_id):
             'You are not allowed to view this exam result.'
         )
 
-    selected_choices = submission.choices.all()
-    questions = Question.objects.filter(course=course)
+    selected_ids = list(
+        submission.choices.values_list('id', flat=True)
+    )
 
-    earned_score = 0
-    total_score = sum(question.grade for question in questions)
+    earned_score, total_score = get_score(course, selected_ids)
+
+    questions = Question.objects.filter(course=course)
+    selected_choices = submission.choices.all()
     question_results = []
 
     for question in questions:
@@ -214,9 +255,6 @@ def show_exam_result(request, course_id, submission_id):
             selected_choice is not None
             and selected_choice.is_correct
         )
-
-        if is_correct:
-            earned_score += question.grade
 
         question_results.append({
             'question': question,
@@ -234,6 +272,7 @@ def show_exam_result(request, course_id, submission_id):
         'course': course,
         'submission': submission,
         'question_results': question_results,
+        'selected_ids': selected_ids,
         'grade': earned_score,
         'total_score': total_score,
         'percentage': percentage,
