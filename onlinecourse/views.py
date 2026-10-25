@@ -4,6 +4,11 @@ from django.http import HttpResponseRedirect
 from .models import Course, Lesson, Enrollment, Question, Choice, Submission
 
 
+def course_details(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    return render(request, 'onlinecourse/course_details_bootstrap.html', {'course': course})
+
+
 def submit(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     if request.method == 'POST':
