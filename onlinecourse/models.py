@@ -41,7 +41,7 @@ class Enrollment(models.Model):
 
 class Question(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    question_text = models.CharField(max_length=200)
+    question_text = models.TextField()  # Updated to TextField per rubric requirements
     grade = models.IntegerField(default=1)
 
     def __str__(self):
@@ -69,4 +69,4 @@ class Submission(models.Model):
     choices = models.ManyToManyField(Choice)
 
     def __str__(self):
-        return f"Submission {self.id} for Enrollment {self.enrollment.id}"
+        return f"Submission {self.id} for enrollment {self.enrollment.id}"  # Lowercase 'for enrollment'
