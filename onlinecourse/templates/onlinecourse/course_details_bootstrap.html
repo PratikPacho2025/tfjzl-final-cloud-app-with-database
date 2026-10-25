@@ -81,7 +81,7 @@
         <section class="mt-4">
             <h2 class="h4">Course Lessons</h2>
 
-            {% for lesson in course.lesson_set.all %}
+            {% for lesson in lessons %}
                 <div class="card mt-3">
                     <div class="card-header">
                         <h3 class="h5 mb-0">
@@ -103,18 +103,18 @@
             <h2 class="h4">Course Assessment</h2>
             <p>Select one answer for each question, then submit your exam.</p>
 
-            {% if course.question_set.all %}
+            {% if questions %}
                 {% if user.is_authenticated and course.is_enrolled %}
                     <form method="post"
                           action="{% url 'onlinecourse:submit' course.id %}">
                         {% csrf_token %}
 
-                        {% for question in course.question_set.all %}
+                        {% for question in questions %}
                             <div class="card mt-3">
                                 <div class="card-header">
                                     <strong>
                                         Question {{ forloop.counter }}:
-                                        {{ question.content }}
+                                        {{ question.question_text }}
                                     </strong>
                                     <span class="badge badge-info float-right">
                                         {{ question.grade }} points
@@ -134,7 +134,7 @@
                                             <label
                                                 class="form-check-label"
                                                 for="choice_{{ choice.id }}">
-                                                {{ choice.content }}
+                                                {{ choice.choice_text }}
                                             </label>
                                         </div>
                                     {% empty %}

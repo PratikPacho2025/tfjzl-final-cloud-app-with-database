@@ -21,17 +21,17 @@ class AssessmentFlowTests(TestCase):
         )
         self.question = Question.objects.create(
             course=self.course,
-            content='Which framework is this project using?',
+            question_text='Which framework is this project using?',
             grade=5,
         )
         self.correct_choice = Choice.objects.create(
             question=self.question,
-            content='Django',
+            choice_text='Django',
             is_correct=True,
         )
         self.incorrect_choice = Choice.objects.create(
             question=self.question,
-            content='Flask',
+            choice_text='Flask',
             is_correct=False,
         )
         self.enrollment = Enrollment.objects.create(
@@ -52,8 +52,8 @@ class AssessmentFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.course.name)
         self.assertContains(response, 'Course Lessons')
-        self.assertContains(response, self.question.content)
-        self.assertContains(response, self.correct_choice.content)
+        self.assertContains(response, self.question.question_text)
+        self.assertContains(response, self.correct_choice.choice_text)
 
     def test_enrolled_learner_submission_is_scored_on_server(self):
         self.client.force_login(self.user)
@@ -83,6 +83,8 @@ class AssessmentFlowTests(TestCase):
         self.assertContains(result, 'Congratulations!')
         self.assertContains(result, '5 / 5')
         self.assertContains(result, '100%')
+        self.assertContains(result, 'Correct answer:')
+        self.assertContains(result, self.correct_choice.choice_text)
 
     def test_incorrect_answer_does_not_earn_marks(self):
         self.client.force_login(self.user)
@@ -111,6 +113,37 @@ class AssessmentFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertContains(result, '0 / 5')
         self.assertContains(result, '0%')
+
+    def test_result_page_displays_every_question_and_correct_answer(self):
+        second_question = Question.objects.create(
+            course=self.course,
+            question_text='Which template language does Django use?',
+            grade=3,
+        )
+        second_correct_choice = Choice.objects.create(
+            question=second_question,
+            choice_text='Django templates',
+            is_correct=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse(
+                'onlinecourse:submit',
+                kwargs={'course_id': self.course.pk},
+            ),
+            {
+                f'choice_{self.question.pk}': str(self.correct_choice.pk),
+                f'choice_{second_question.pk}': str(second_correct_choice.pk),
+            },
+        )
+        result = self.client.get(response.url)
+
+        self.assertContains(result, self.question.question_text)
+        self.assertContains(result, self.correct_choice.choice_text)
+        self.assertContains(result, second_question.question_text)
+        self.assertContains(result, second_correct_choice.choice_text)
+        self.assertContains(result, '8 / 8')
 
     def test_submission_requires_authentication_and_enrollment(self):
         submit_url = reverse(

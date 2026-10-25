@@ -121,6 +121,10 @@ class CourseDetailView(generic.DetailView):
             self.request.user,
             course
         )
+        context['lessons'] = course.lesson_set.all().order_by('order')
+        context['questions'] = course.question_set.all().prefetch_related(
+            'choice_set'
+        )
         return context
 
 
@@ -165,17 +169,9 @@ def get_score(course, selected_ids):
     earned_score = 0
     total_score = 0
 
-    selected_choices = Choice.objects.filter(
-        id__in=selected_ids,
-        question__course=course
-    )
-
     for question in questions:
         total_score += question.grade
-
-        choice = selected_choices.filter(question=question).first()
-
-        if choice is not None and choice.is_correct:
+        if question.is_get_score(selected_ids):
             earned_score += question.grade
 
     return earned_score, total_score
@@ -242,7 +238,9 @@ def show_exam_result(request, course_id, submission_id):
 
     earned_score, total_score = get_score(course, selected_ids)
 
-    questions = Question.objects.filter(course=course)
+    questions = Question.objects.filter(course=course).prefetch_related(
+        'choice_set'
+    )
     selected_choices = submission.choices.all()
     question_results = []
 
@@ -253,13 +251,16 @@ def show_exam_result(request, course_id, submission_id):
 
         is_correct = (
             selected_choice is not None
-            and selected_choice.is_correct
+            and question.is_get_score(selected_ids)
         )
 
         question_results.append({
             'question': question,
+            'choices': question.choice_set.all(),
             'selected_choice': selected_choice,
+            'correct_choices': question.choice_set.filter(is_correct=True),
             'is_correct': is_correct,
+            'marks': question.grade if is_correct else 0,
         })
 
     percentage = (
@@ -274,6 +275,7 @@ def show_exam_result(request, course_id, submission_id):
         'question_results': question_results,
         'selected_ids': selected_ids,
         'grade': earned_score,
+        'possible': total_score,
         'total_score': total_score,
         'percentage': percentage,
         'passed': percentage >= 80,

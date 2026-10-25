@@ -33,7 +33,7 @@
         <div class="card mt-3">
             <div class="card-body">
                 <h4>Your Score</h4>
-                <p>Score: {{ grade }} / {{ total_score }}</p>
+                <p>Score: {{ grade }} / {{ possible }}</p>
                 <p>Percentage: {{ percentage }}%</p>
             </div>
         </div>
@@ -44,17 +44,37 @@
             <div class="card mt-3">
                 <div class="card-header">
                     Question {{ forloop.counter }}:
-                    {{ result.question.content }}
+                    {{ result.question.question_text }}
                 </div>
                 <div class="card-body">
+                    <p><strong>Choices:</strong></p>
+                    <ul>
+                        {% for choice in result.choices %}
+                            <li {% if choice.id in selected_ids %}class="font-weight-bold"{% endif %}>
+                                {{ choice.choice_text }}
+                                {% if choice.id in selected_ids %}(Your selection){% endif %}
+                            </li>
+                        {% empty %}
+                            <li>No choices were provided.</li>
+                        {% endfor %}
+                    </ul>
                     <p>
                         Your answer:
                         {% if result.selected_choice %}
-                            {{ result.selected_choice.content }}
+                            {{ result.selected_choice.choice_text }}
                         {% else %}
                             Not answered
                         {% endif %}
                     </p>
+                    <p>
+                        Correct answer:
+                        {% for choice in result.correct_choices %}
+                            {{ choice.choice_text }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            No correct answer configured
+                        {% endfor %}
+                    </p>
+                    <p>Marks: {{ result.marks }} / {{ result.question.grade }}</p>
 
                     {% if result.is_correct %}
                         <p class="text-success">Correct answer</p>
