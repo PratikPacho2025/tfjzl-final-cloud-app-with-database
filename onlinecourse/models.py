@@ -42,7 +42,7 @@ class Enrollment(models.Model):
 class Question(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     question_text = models.CharField(max_length=200)
-    grade = models.IntegerField(default=5)
+    grade = models.IntegerField(default=1)
 
     def __str__(self):
         return self.question_text
@@ -57,7 +57,7 @@ class Question(models.Model):
 
 class Choice(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    choice_text = models.CharField(max_length=100)  # Corrected from 50 to 100
+    choice_text = models.CharField(max_length=100)
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
@@ -69,4 +69,4 @@ class Submission(models.Model):
     choices = models.ManyToManyField(Choice)
 
     def __str__(self):
-        return f"Submission {self.id}"
+        return f"Submission {self.id} for Enrollment {self.enrollment.id}"
